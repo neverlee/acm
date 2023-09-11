@@ -1,0 +1,361 @@
+AC自动机，说白了还是一种处理字符串的数据结构。
+
+ 
+
+在建立的trie树的基础上，用kmp。  达到快速匹配的目的。一个最简单的应用，就是给定一些单词，然后给定一段文本，求这些单词中有多少个在这段文本中出现过。
+
+ 
+
+看到网上一堆都是hdu2222的解题报告，我也结合此题说说自己对AC自动机的理解吧
+
+ 
+
+题目链接：http://acm.hdu.edu.cn/showproblem.php?pid=2222  就是AC自动机最基本的应用。
+
+ 
+
+ 
+
+ 
+
+因为AC自动机是建立在字典树的基础上的，所以首先要建立trie
+
+ 
+
+这是节点的结构：
+
+ 
+
+[c-sharp] view plaincopy
+
+    struct node {  
+        int fail;  
+        int count;  
+        int nxt[26];  
+        void init() {  
+            count = 0;  
+            memset(nxt,-1,sizeof(nxt));  
+        }  
+    } num[500010];  
+
+ 
+
+ 
+
+建立字典树fail  属性是不需要的  ，fail是为了后面的在trie上执行kmp而设的。  
+
+count是用来统计该单词出现的次数。
+
+init()用来初始化。    nxt值为-1则表示无后续节点
+
+ 
+
+先建trie结构，注意，是用所给单词建立字典树，要不然也不会叫字典树了:-)
+
+代码如下：
+
+因为我是用数组静态模拟trie  ，所以len用来表示总共用了多少个num元素，即用了多少个node节点。
+
+[c-sharp] view plaincopy
+
+    int len;  
+    void insert(char *str) {  
+        int i =0;  
+        int p =0;  
+        while(str[i]) {  
+            int ind = str[i]-'a';  
+            if(num[p].nxt[ind]==-1) {  
+                num[p].nxt[ind] = ++len;  
+                num[len].init();  
+            }  
+            p = num[p].nxt[ind];  
+            ++i;  
+        }  
+        ++num[p].count;  
+    }  
+
+ 
+
+ 
+
+ 
+
+建立的trie如下：
+
+ 
+
+ 
+
+（不是很会用绘图软件，尤其是在linux下，随手画的。。。）
+
+ 
+
+接下来就是在已经建立的字典树上执行kmp了
+
+ 
+
+ 
+
+ 
+
+ 
+
+可以回想一下 ，kmp算法中next函数记录的是什么：
+
+ 
+
+  比如对字符串  ababababca
+
+ 
+
+   i        1  2  3  4  5  6  7  8  9  10
+
+ p[i]     a  b  a  b   a  b  a  b  c  a
+
+next[i] 0  0  1  2   3  4  5  6  0  1
+
+ 
+
+假设有一段文本     。。。。。。ababab  c。。。。。
+
+                                                         ababab  abca
+
+到c字符，发现不匹配了，然后移动模式串
+
+ 
+
+                                 。。。。。。ababab  c。。。。。
+
+                                                              abab  ababca
+
+ 
+
+我们想让位移为可能的合法位移的话，我们就必须保证  文本串  的ababab部分的真后缀  abab和  模式串的前缀  abab(ababca)相等，而这个前缀越长越好。    而我们又发现，模式串的  ababab部分在前一刻是和文本串相匹配的，  所以文本串ababab 部分的真后缀就是模式串ababab部分的真后缀。    就上述情况而言，   abab是为pat串 ababab这一部分真后缀的最长前缀
+
+ 
+
+所以next 函数就是预处理模式串，求为模式串某一段真后缀的最长前缀。
+
+ 
+
+以上只是回忆一下kmp算法部分。
+
+ 
+
+现在我们要在trie上执行kmp   
+
+ 
+
+由于文本路线不止一条，而我们执行kmp的目的，也是为了最后的文本匹配服务的。  所以我们记录的next位置（即fail） ，就是为某一段字串真后缀的另一段字串的前缀。
+
+ 
+
+现在说着个或许不大好理解，看看执行过程再慢慢体会就好了。
+
+ 
+
+这是建立AC自动机部分的代码，即是执行kmp的算法：
+
+这里需要对已经建立的字典树，逐层遍历，所以需要借助队列。
+
+
+ 
+
+[c-sharp] view plaincopy
+
+    void buildAC() {  
+        int i;  
+        queue<int> cq;  
+        for(i=0; i<26; ++i)  
+            if(num[0].nxt[i]!=-1) {  
+                num[num[0].nxt[i]].fail = 0;  
+                cq.push(num[0].nxt[i]);  
+            }  
+        int p;  
+        while(!cq.empty()) {  
+            p = cq.front();  
+            cq.pop();  
+            for(i=0; i<26; ++i)  
+                if(num[p].nxt[i]!=-1) {  
+                    cq.push(num[p].nxt[i]);  
+                    int tmp = num[p].fail;  
+                    while(tmp>0&&num[tmp].nxt[i]==-1)  
+                        tmp = num[tmp].fail;  
+                    if(num[tmp].nxt[i]!=-1)  
+                        num[num[p].nxt[i]].fail = num[tmp].nxt[i];  
+                    else num[num[p].nxt[i]].fail = 0;  
+                }  
+        }  
+        return;  
+    }  
+
+ 
+
+ 
+
+首先第一个for语句是初始话的作用，类似kmp的初始化，即把第一个字符的next函数，指向其前一个节点。
+
+这里root中没有字符，root的孩子都是不同分支中的第一个节点，所以root的孩子的fail值都指向root
+
+ 
+
+执行完后就是这个样子：
+
+ 
+
+ 
+
+接下来就是逐层为每个节点求出fail的位置
+
+ 
+
+全部求完以后就是这种样子：
+
+ 
+
+这样，kmp部分就已经完成了。
+
+ 
+
+ 
+
+接下来就是，给定文本进行匹配了：
+
+ 
+
+[c-sharp] view plaincopy
+
+    int query(char *str) {  
+        int ret(0);  
+        int i = 0;  
+        int p = 0;  
+        while(str[i]) {  
+            int ind = str[i]-'a';  
+            while(p>0&&num[p].nxt[ind]==-1)  
+                p = num[p].fail;  
+            if(num[p].nxt[ind]!=-1)  
+                p = num[p].nxt[ind];  
+            else p = 0;  
+            int tmp = p;  
+            while(tmp!=0&&num[tmp].count!=-1) {  
+                ret+=num[tmp].count;  
+                num[tmp].count = -1;  
+                tmp = num[tmp].fail;  
+            }  
+            ++i;  
+        }  
+        return ret;  
+    }  
+
+ 
+
+ 
+
+匹配部分就比较简单了，p就是当前的匹配位置，如果对于  某个p  如果num[p].nxt[ind]!=-1 （ind = str[i]-'a'）则说明，p的子节点中有和str[i],相匹配的。   否则，p = num[p].fail  知道p为root  （即 0）为止。
+
+和普通kmp的匹配部分完全一样。
+
+ 
+
+ 
+
+三个函数结合，即构成了AC自动机
+
+这是hdu2222  的代码：
+#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <queue>
+using namespace std;
+struct node {
+    int fail;
+    int count;
+    int nxt[26];
+    void init() {
+        count = 0;
+        memset(nxt,-1,sizeof(nxt));
+    }
+} num[500010];
+int len;
+void insert(char *str) {
+    int i =0;
+    int p =0;
+    while(str[i]) {
+        int ind = str[i]-'a';
+        if(num[p].nxt[ind]==-1) {
+            num[p].nxt[ind] = ++len;
+            num[len].init();
+        }
+        p = num[p].nxt[ind];
+        ++i;
+    }
+    ++num[p].count;
+}
+void buildAC() {
+    int i;
+    queue<int> cq;
+    for(i=0; i<26; ++i)
+        if(num[0].nxt[i]!=-1) {
+            num[num[0].nxt[i]].fail = 0;
+            cq.push(num[0].nxt[i]);
+        }
+    int p;
+    while(!cq.empty()) {
+        p = cq.front();
+        cq.pop();
+        for(i=0; i<26; ++i)
+            if(num[p].nxt[i]!=-1) {
+                cq.push(num[p].nxt[i]);
+                int tmp = num[p].fail;
+                while(tmp>0&&num[tmp].nxt[i]==-1)
+                    tmp = num[tmp].fail;
+                if(num[tmp].nxt[i]!=-1)
+                    num[num[p].nxt[i]].fail = num[tmp].nxt[i];
+                else num[num[p].nxt[i]].fail = 0;
+            }
+    }
+    return;
+}
+int query(char *str) {
+    int ret(0);
+    int i = 0;
+    int p = 0;
+    while(str[i]) {
+        int ind = str[i]-'a';
+        while(p>0&&num[p].nxt[ind]==-1)
+            p = num[p].fail;
+        if(num[p].nxt[ind]!=-1)
+            p = num[p].nxt[ind];
+        else p = 0;
+        int tmp = p;
+        while(tmp!=0&&num[tmp].count!=-1) {
+            ret+=num[tmp].count;
+            num[tmp].count = -1;
+            tmp = num[tmp].fail;
+        }
+        ++i;
+    }
+    return ret;
+}
+char str[60];
+char text[1000010];
+int main() {
+    int T;
+    scanf("%d",&T);
+    while(T--) {
+        int n;
+        scanf("%d",&n);
+        num[0].init();
+        len = 0;
+        while(n--) {
+            scanf("%s",str);
+            insert(str);
+        }
+        buildAC();
+        scanf("%s",text);
+    printf("%d/n",query(text));
+    }
+    return 0;
+}
+
