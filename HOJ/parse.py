@@ -1,40 +1,54 @@
-
-
-from bs4 import BeautifulSoup
-import os
 import re
+import html
+import os
 
-pbmap = {}
-lgmap = {}
-jrmap = {}
+def getdata(fname):
+    fin = open(fname)
+    data = fin.read()
+    fin.close()
+    return str(data)
 
-root = "commit/"
-for fname in os.listdir():
-    fpath = root + fname
-    with open(fpath) as f:
-        fdata = f.read()
-        soup = BeautifulSoup(fdata, "html.parser")
+patpid = re.compile("Problem : </b>(\d+)")
+patlang = re.compile("Language : </b>([\w\s\+]+)")
+patcode = re.compile("<pre>(.*)</pre>")
 
-        pblb = soup.find(name="b", string=re.compile('Problem :', re.S))
-        pbid = pblb.next_sibling
+def getcodepage(data, fid):
+    #data = data[5189:-561]
+    #data = data[5189:-550]
+    #print(data)
+    pid = patpid.findall(data)
+    if (not pid) or len(pid) < 1:
+        print("find problem id error")
+    pid = pid[0]
+    lang = patlang.findall(data)
+    if (not lang) or len(lang) < 1:
+        print("find lang error")
+    lang = lang[0]
+    code = patcode.findall(data)
+    if (not code) or len(code) < 1:
+        print("find code error")
+    print("get:", pid, lang)
+    #print(code[0])
+    ncode = html.unescape(code[0])
+    ncode = ncode.replace("\\r\\n", "\n")
+    ncode = ncode.replace("\\\\", "\\")
+    #ncode = ncode.replace("\\n", "\n")
+    #print(ncode)
 
-        lglb = soup.find(name="b", string=re.compile('Language :', re.S))
-        lgname = lglb.next_sibling.string.split('\\')[0]
+    sname = "ncode/" + pid + "-" + fid + "."
+    if lang == "GNU C++":
+        sname = sname + "cc"
+    elif lang == "Java":
+        sname = sname + "java"
+    else:
+        sname = sname + "c"
+    print("write:", sname)
+    with open(sname, "w") as fout:
+        fout.write(ncode)
 
-        jrlb = soup.find(name="b", string=re.compile('Judge Result:', re.S))
-        jr = jrlb.next_sibling.string
-
-        sclb = soup.find(name="b", string=re.compile('Source Code', re.S))
-        sc = str(sclb.parent.parent.next_sibling.next_sibling.pre.string).replace("\xa0", " ").replace("\\r", "").encode("utf8").decode('unicode_escape')
-
-        print(fpath, pbid, lgname, jr)
-        # print(sc)
-        pbmap[pbid] = pbmap.get(pbid, 0) + 1
-        lgmap[lgname] = lgmap.get(lgname, 0) + 1
-        jrmap[jr] = jrmap.get(jr, 0) + 1
-
-
-print(lgmap)
-print(jrmap)
-print(len(pbmap))
+for fname in os.listdir("save"):
+    fpath = "save/" + fname
+    print(fpath)
+    data = getdata(fpath)
+    getcodepage(data, fname)
 
